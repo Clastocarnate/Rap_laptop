@@ -10,45 +10,68 @@ import matplotlib.pyplot as plt
 import nibabel as nib
 import os
 
+
+
 # Optional: for 3D interactive viewing (pip install pyvista)
 try:
     import pyvista as pv
     PV_AVAILABLE = True
+    print("Available")
 except Exception:
+    print("Fuck off")
     PV_AVAILABLE = False
 
 def load_and_repair(path):
     mesh = trimesh.load(path, force='mesh')
     if mesh.is_empty:
-        raise ValueError("Loaded mesh empty")
-    # Basic cleanups
-    trimesh.repair.fix_inversion(mesh)        # fix flipped faces
-    trimesh.repair.remove_duplicate_faces(mesh)
-    trimesh.repair.remove_degenerate_faces(mesh)
-    mesh.remove_unreferenced_vertices()
-    # Fill holes if not watertight (best-effort)
+        raise ValueError("Loaded mesh is empty")
+
+    # Fix normals / winding
+    try:
+        trimesh.repair.fix_inversion(mesh)
+    except Exception:
+        pass
+
+    # These are METHODS on the mesh, not in trimesh.repair
+    try:
+        mesh.remove_duplicate_faces()
+    except Exception:
+        pass
+
+    try:
+        mesh.remove_degenerate_faces()
+    except Exception:
+        pass
+
+    try:
+        mesh.remove_unreferenced_vertices()
+    except Exception:
+        pass
+
+    # Try hole filling if not watertight
     if not mesh.is_watertight:
         try:
             trimesh.repair.fill_holes(mesh)
         except Exception:
             pass
+
     return mesh
 
+
 def mesh_to_voxels(mesh, pitch=None, target_dim=None):
-    # If user provides pitch (size of voxel in mesh units) use it.
-    # Otherwise compute pitch to fit mesh bounding box into target_dim
-    bbox = mesh.bounds  # array [[minx,miny,minz],[maxx,maxy,maxz]]
+    bbox = mesh.bounds
     dims = bbox[1] - bbox[0]
+
     if pitch is None:
-        assert target_dim is not None, "Either pitch or target_dim must be set"
-        max_dim = dims.max()
-        pitch = max_dim / float(target_dim)
-    # Voxelize
+        assert target_dim is not None
+        pitch = dims.max() / float(target_dim)
+
     v = mesh.voxelized(pitch)
-    mat = v.matrix.copy()  # boolean 3D array (shape roughly (nx,ny,nz))
-    # Compute origins so we know mapping from voxel indices to mesh coordinates:
-    origin = v.origin  # world coords of voxel [0,0,0] corner
+    mat = v.matrix.copy()
+
+    origin = v.bounds[0]   # ✅ correct
     return mat, pitch, origin
+
 
 def occupancy_to_attenuation(occ, base_mu=0.02, laptop_mu=0.8, smoothing_sigma=1.0):
     """
@@ -79,24 +102,37 @@ def show_slices(volume):
     axes[2].imshow(volume[:,:,xc], cmap='gray'); axes[2].set_title(f'X slice {xc}')
     plt.show()
 
-def view_3d_pyvista(volume, spacing=(1,1,1)):
-    if not PV_AVAILABLE:
-        print("PyVista not available. pip install pyvista for 3D viewing")
-        return
-    # volume should be a boolean or float grid; convert to pyvista UniformGrid
+def view_3d_pyvista(volume, spacing=(1.0, 1.0, 1.0)):
+    """
+    Interactive 3D volume rendering using PyVista.
+    volume shape: (Z, Y, X)
+    """
+    volume = np.asarray(volume)
     nz, ny, nx = volume.shape
-    grid = pv.UniformGrid()
-    grid.dimensions = np.array(volume.shape) + 1  # dims are n+1 for cells
-    grid.origin = (0,0,0)
-    grid.spacing = spacing  # voxel spacing
-    # set cell data
-    grid.cell_arrays["values"] = volume.flatten(order="F")  # Fortran order
+
+    grid = pv.ImageData()
+    grid.dimensions = np.array(volume.shape) + 1
+    grid.origin = (0.0, 0.0, 0.0)
+    grid.spacing = spacing
+
+    # 🔑 correct API for new PyVista
+    grid.cell_data["values"] = volume.flatten(order="F")
+
     p = pv.Plotter()
-    p.add_volume(grid, cmap="gray", opacity="sigmoid")
+    p.add_volume(
+        grid,
+        scalars="values",
+        cmap="gray",
+        opacity="sigmoid",
+        shade=True
+    )
+    p.show_axes()
     p.show()
 
+
+
 if __name__ == "__main__":
-    stl_path = "example.stl"       # replace with your file
+    stl_path = "Closed_position.stl"       # replace with your file
     out_dir = "out_vox"
     os.makedirs(out_dir, exist_ok=True)
 
@@ -127,3 +163,5 @@ if __name__ == "__main__":
     show_slices(vol)
     if PV_AVAILABLE:
         view_3d_pyvista(vol, spacing=(pitch,pitch,pitch))
+        view_volume_pyvista(vol, pitch)
+
