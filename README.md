@@ -1,6 +1,7 @@
 # Dependencies
+```bash
 pip install trimesh numpy scipy matplotlib nibabel pyvista
-
+```
 
 # Visualiser Testing
 - visualiser.py = .stl -> voxels -> visualise
