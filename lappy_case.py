@@ -177,8 +177,8 @@ if __name__ == "__main__":
     os.makedirs(out_dir, exist_ok=True)
 
     # Load meshes
-    briefcase = load_and_repair("briefcase.stl")
-    laptop = load_and_repair("laptop.stl")
+    briefcase = load_and_repair("objects/briefcase.stl")
+    laptop = load_and_repair("objects/laptop.stl")
 
     print("Briefcase extents:", briefcase.extents)
     print("Laptop extents:", laptop.extents)
