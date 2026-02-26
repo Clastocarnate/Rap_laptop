@@ -13,7 +13,7 @@ Python codes:
 - Randomise_lappy.py -> testing lappy in random orientations
 - data_test.py -> Just visualising the objects before collecting the dataset
 - shapes_tetris.py -> Generates n random scenes with and without laptop
-![shape_tetris](output_ss/shape_tetris_output.png)
+![shape_tetris](output_ss/shapes_tetris_output.png)
 
 TO DO
 - folder structuring
